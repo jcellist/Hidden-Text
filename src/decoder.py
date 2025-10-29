@@ -1,46 +1,51 @@
 from PIL import Image
-""" Importa o marcador do encoder para garantir consistência """
-from src.encoder import MARCADOR_FIM 
+""" Import the end marker from the encoder to ensure consistency """
+from src.encoder import MARCADOR_FIM
 
-def bits_para_texto(sequencia_bits: str) -> str:
-    """Converte a sequência binária (blocos de 8 bits) de volta para texto ASCII."""
-    mensagem = ""
-    """ Itera de 8 em 8 bits (o tamanho de um caractere) """
-    for i in range(0, len(sequencia_bits), 8):
-        bloco_8_bits = sequencia_bits[i:i + 8]
-        
+
+def bits_to_text(bit_sequence: str) -> str:
+    """
+    Converts a binary sequence (8-bit blocks) back into ASCII text.
+    """
+    message = ""
+    """ Iterate over the sequence 8 bits at a time (1 byte = 1 character) """
+    for i in range(0, len(bit_sequence), 8):
+        byte_block = bit_sequence[i:i + 8]
+
         try:
-            """ Converte o binário para inteiro (base 2) e depois para caractere """
-            valor_inteiro = int(bloco_8_bits, 2) 
-            mensagem += chr(valor_inteiro)
+            """ Convert binary to integer (base 2), then to a character """
+            int_value = int(byte_block, 2)
+            message += chr(int_value)
         except ValueError:
+            """ Stop if the block cannot be converted (incomplete byte, etc.) """
             break
-            
-    return mensagem
 
-def decodificar_mensagem(imagem: Image.Image) -> str:
-    """
-    Extrai o texto escondido lendo o LSB do canal Azul de cada pixel até
-    encontrar o marcador de fim.
-    """
-    pixels = imagem.load()
-    largura, altura = imagem.size
-    sequencia_bits_total = ""
-    marcador_len = len(MARCADOR_FIM)
-    
-    print("Status: Lendo LSBs da imagem...")
+    return message
 
-    for y in range(altura):
-        for x in range(largura):
+
+def decode_message(image: Image.Image) -> str:
+    """
+    Extracts the hidden text by reading the Least Significant Bit (LSB)
+    of the Blue channel in each pixel until the end marker is found.
+    """
+    pixels = image.load()
+    width, height = image.size
+    bit_sequence = ""
+    marker_len = len(MARCADOR_FIM)
+
+    print("Status: Reading LSBs from the image...")
+
+    for y in range(height):
+        for x in range(width):
             R, G, B = pixels[x, y]
-            
-            """ Extração do LSB do canal Azul """
-            lsb = B & 1 
-            sequencia_bits_total += str(lsb)
-            
-            """ Checagem eficiente do marcador de fim """
-            if len(sequencia_bits_total) >= marcador_len and sequencia_bits_total.endswith(MARCADOR_FIM):
-                """ Retorna a mensagem já convertida para texto, removendo o marcador """
-                return bits_para_texto(sequencia_bits_total[:-marcador_len])
 
-    return "ERRO: Mensagem oculta não encontrada ou não terminada."
+            """ Extract the LSB of the Blue channel """
+            lsb = B & 1
+            bit_sequence += str(lsb)
+
+            """ Check if the end marker has been reached """
+            if len(bit_sequence) >= marker_len and bit_sequence.endswith(MARCADOR_FIM):
+                """ Return the decoded message (without the marker) """
+                return bits_to_text(bit_sequence[:-marker_len])
+
+    return "ERROR: Hidden message not found or incomplete."
