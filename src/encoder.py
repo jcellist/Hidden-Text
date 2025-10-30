@@ -1,50 +1,98 @@
 from typing import Union
 from PIL import Image
 
-def codificar_mensagem(imagem: Image.Image, sequencia_bits: str) -> Image.Image:
+def encode_message(image: Image.Image, bit_sequence: str) -> Image.Image:
+    """
+    Encodes a bit sequence into the image using the LSB (Least Significant Bit)
+    of the Blue (B) channel. Preserves the alpha channel if present.
+    
+    Args:
+        image (Image.Image): PIL image to encode.
+        bit_sequence (str): Bit sequence (string containing only '0' and '1').
 
-    if not isinstance(sequencia_bits, str) or any(b not in "01" for b in sequencia_bits):
-        raise ValueError("sequencia_bits deve ser uma string contendo apenas '0' e '1'.")
+    Returns:
+        Image.Image: Encoded image. If the message is too long, returns the 
+                     original image unchanged.
 
-    if imagem.mode not in ("RGB", "RGBA"):
-        imagem = imagem.convert("RGBA")
+    Raises:
+        ValueError: If bit_sequence is not a string or contains characters other than '0' or '1'.
+    """
+    
+    """
+    Validate the bit sequence
+    """
+    if not isinstance(bit_sequence, str) or any(b not in "01" for b in bit_sequence):
+        raise ValueError("bit_sequence must be a string containing only '0' and '1'.")
 
-    pixels = imagem.load()        
-    largura, altura = imagem.size
-    capacidade = largura * altura  
+    """
+    Convert image to RGBA if it is not RGB or RGBA
+    """
+    if image.mode not in ("RGB", "RGBA"):
+        image = image.convert("RGBA")
 
-    if len(sequencia_bits) > capacidade:
-        print("A mensagem é muito longa para esta imagem!")
-        print(f"Capacidade máxima: {capacidade} bits — Mensagem: {len(sequencia_bits)} bits.")
-        return imagem 
+    """
+    Load pixels and calculate image capacity
+    """
+    pixels = image.load()        
+    width, height = image.size
+    capacity = width * height  # maximum capacity in bits (1 bit per pixel)
 
-    indice_bit = 0
-    tamanho_bits = len(sequencia_bits)
+    """
+    Check if the message fits in the image
+    """
+    if len(bit_sequence) > capacity:
+        print("The message is too long for this image!")
+        print(f"Maximum capacity: {capacity} bits — Message length: {len(bit_sequence)} bits.")
+        return image 
 
-    for y in range(altura):
-        for x in range(largura):
-            if indice_bit >= tamanho_bits:
-                return imagem  
+    """
+    Initialize index to track which bit is being encoded
+    """
+    bit_index = 0
+    total_bits = len(bit_sequence)
+
+    """
+    Loop through all pixels to encode the message
+    """
+    for y in range(height):
+        for x in range(width):
+            if bit_index >= total_bits:
+                return image  # message fully encoded
 
             pixel = pixels[x, y]
 
+            """
+            Separate RGB channels and preserve alpha if present
+            """
             if len(pixel) == 3:
                 R, G, B = pixel
                 A = None
             else:
                 R, G, B, A = pixel
 
-            bit_msg = int(sequencia_bits[indice_bit])  
+            """
+            Get the current bit of the message
+            """
+            bit = int(bit_sequence[bit_index])  
 
-            B_zerado = B & 254 
+            """
+            Clear the LSB of Blue and set it to the message bit
+            """
+            B_cleared = B & 254 
+            B_final = B_cleared | bit
 
-            B_final = B_zerado | bit_msg
-
+            """
+            Update the pixel in the image with the new Blue channel
+            """
             if A is None:
                 pixels[x, y] = (R, G, B_final)
             else:
                 pixels[x, y] = (R, G, B_final, A)
 
-            indice_bit += 1
+            """
+            Move to the next bit
+            """
+            bit_index += 1
 
-    return imagem
+    return image
+
