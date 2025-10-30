@@ -1,98 +1,45 @@
-from typing import Union
 from PIL import Image
 
-def encode_message(image: Image.Image, bit_sequence: str) -> Image.Image:
-    """
-    Encodes a bit sequence into the image using the LSB (Least Significant Bit)
-    of the Blue (B) channel. Preserves the alpha channel if present.
-    
-    Args:
-        image (Image.Image): PIL image to encode.
-        bit_sequence (str): Bit sequence (string containing only '0' and '1').
+""" End marker used to indicate where the hidden message stops """
+MARCADOR_FIM = "00000000"
 
-    Returns:
-        Image.Image: Encoded image. If the message is too long, returns the 
-                     original image unchanged.
+def text_to_bits(message: str) -> str:
+    """
+    Converts a text string into a binary sequence (8 bits per character).
+    """
+    """ Convert each character into its 8-bit binary representation """
+    return "".join(format(ord(char), "08b") for char in message)
 
-    Raises:
-        ValueError: If bit_sequence is not a string or contains characters other than '0' or '1'.
+def encode_message(image: Image.Image, message: str) -> Image.Image:
     """
-    
+    Encodes a text message into the LSB of the blue channel of the given image.
     """
-    Validate the bit sequence
-    """
-    if not isinstance(bit_sequence, str) or any(b not in "01" for b in bit_sequence):
-        raise ValueError("bit_sequence must be a string containing only '0' and '1'.")
+    """ Convert message to bits and append the end marker """
+    bit_sequence = text_to_bits(message) + MARCADOR_FIM
 
-    """
-    Convert image to RGBA if it is not RGB or RGBA
-    """
-    if image.mode not in ("RGB", "RGBA"):
-        image = image.convert("RGBA")
-
-    """
-    Load pixels and calculate image capacity
-    """
-    pixels = image.load()        
+    """ Get image data and prepare pixel map """
+    pixels = image.load()
     width, height = image.size
-    capacity = width * height  # maximum capacity in bits (1 bit per pixel)
+    total_pixels = width * height
 
-    """
-    Check if the message fits in the image
-    """
-    if len(bit_sequence) > capacity:
-        print("The message is too long for this image!")
-        print(f"Maximum capacity: {capacity} bits — Message length: {len(bit_sequence)} bits.")
-        return image 
+    """ Check message capacity """
+    if len(bit_sequence) > total_pixels:
+        raise ValueError("ERROR: Message too long for the image capacity.")
 
-    """
-    Initialize index to track which bit is being encoded
-    """
+    print("Status: Encoding message into image...")
+
+    """ Encode each bit into the blue channel of the pixels """
     bit_index = 0
-    total_bits = len(bit_sequence)
-
-    """
-    Loop through all pixels to encode the message
-    """
     for y in range(height):
         for x in range(width):
-            if bit_index >= total_bits:
-                return image  # message fully encoded
+            if bit_index >= len(bit_sequence):
+                """ Stop if the entire message has been encoded """
+                return image
 
-            pixel = pixels[x, y]
-
-            """
-            Separate RGB channels and preserve alpha if present
-            """
-            if len(pixel) == 3:
-                R, G, B = pixel
-                A = None
-            else:
-                R, G, B, A = pixel
-
-            """
-            Get the current bit of the message
-            """
-            bit = int(bit_sequence[bit_index])  
-
-            """
-            Clear the LSB of Blue and set it to the message bit
-            """
-            B_cleared = B & 254 
-            B_final = B_cleared | bit
-
-            """
-            Update the pixel in the image with the new Blue channel
-            """
-            if A is None:
-                pixels[x, y] = (R, G, B_final)
-            else:
-                pixels[x, y] = (R, G, B_final, A)
-
-            """
-            Move to the next bit
-            """
+            R, G, B = pixels[x, y]
+            """ Replace the least significant bit of the blue channel """
+            new_B = (B & 254) | int(bit_sequence[bit_index])
+            pixels[x, y] = (R, G, new_B)
             bit_index += 1
 
     return image
-
